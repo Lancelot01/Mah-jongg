@@ -108,6 +108,16 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
 @media(max-height:760px) and (min-width:850px){.assist-toggle{margin-top:12px;padding:8px 12px}}
 @media(max-width:600px){.wait-pop{font-size:10px;gap:7px;padding:6px 9px}.wait-pop .pop-wait .tile{--tw:18px;--th:25px}.ting-mark{top:-11px;border-width:5px;border-top-width:7px}}
 
+/* ---- v2.2 桌面牌放大鏡 ---- */
+.tile-zoom{position:fixed;left:0;top:0;z-index:31;display:flex;align-items:center;gap:14px;padding:12px 16px 12px 12px;border-radius:10px;background:linear-gradient(135deg,#1b3339f5,#0d1d24f5);border:1px solid #e6c88366;box-shadow:0 16px 40px #000b,0 0 22px #e6c07a22;pointer-events:none;opacity:0;transform:scale(.92);transform-origin:left bottom;transition:opacity .12s,transform .12s}
+.tile-zoom.show{opacity:1;transform:none}
+.tile-zoom .tile.big{--tw:62px;--th:86px;padding-bottom:6px;box-shadow:0 4px 0 #4c7565,0 7px 0 #173f38,4px 12px 12px #0008}
+.tile-zoom .zoom-text{display:flex;flex-direction:column;gap:6px;white-space:nowrap}
+.tile-zoom strong{font:22px var(--serif);font-weight:400;letter-spacing:3px;color:var(--gold-bright)}
+.tile-zoom span{font-size:11px;color:#b9ccc4;letter-spacing:1px}
+.tile-zoom .zoom-seen{color:#8fb3ad;font-size:10px}.tile-zoom .zoom-seen b{font:14px Georgia,serif;color:#ffe2a6;font-weight:400}
+@media(max-width:600px){.tile-zoom{gap:10px;padding:9px 12px 9px 9px}.tile-zoom .tile.big{--tw:46px;--th:64px}.tile-zoom strong{font-size:18px}}
+
 </style>
 </head>
 <body>
@@ -150,11 +160,12 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
   </section>
 
   <div class="modal-layer hidden" id="rules-modal"><section class="modal rules-modal" role="dialog" aria-modal="true" aria-labelledby="rules-title"><button class="close-button" data-close="rules-modal" aria-label="關閉規則">×</button><span class="eyebrow">THE HOUSE RULES</span><h2 id="rules-title">方城有度，落牌有數。</h2><div class="tab-bar"><button class="active" data-rule-tab="basics">本桌玩法</button><button data-rule-tab="scoring">台數一覽</button><button data-rule-tab="ai">牌友與操作</button></div><div id="rules-content" class="rules-content"></div></section></div>
-  <div class="modal-layer hidden" id="settings-modal"><section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><button class="close-button" data-close="settings-modal" aria-label="關閉設定">×</button><span class="eyebrow">TABLE PREFERENCES</span><h2 id="settings-title">從容打牌</h2><div class="speed-setting"><div class="speed-heading"><label for="speed-slider">AI 反應速度<small>每次思考的等待秒數</small></label><output id="speed-value" for="speed-slider">1.0 <small>秒</small></output></div><input type="range" id="speed-slider" min="500" max="2000" step="100" value="1000" aria-label="AI 反應速度" aria-valuetext="1.0 秒"><div class="speed-scale"><span>0.5 秒 · 俐落</span><button id="speed-reset" type="button">恢復 1.0 秒</button><span>2.0 秒 · 從容</span></div></div><label class="setting-row"><span>打牌提示<small>游標指向手牌：牌河同牌閃藍光、打出後聽牌與未現張數、可聽牌的打法標記</small></span><input type="checkbox" id="waits-toggle" checked></label><label class="setting-row"><span>落牌音效<small>輕柔木質敲擊音</small></span><input type="checkbox" id="sound-toggle"></label><p class="muted setting-note">速度可隨時拖曳調整並自動記住。難度與底台在新開一桌時設定。</p><button class="secondary-button" id="back-lobby">回到大廳</button></section></div>
+  <div class="modal-layer hidden" id="settings-modal"><section class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><button class="close-button" data-close="settings-modal" aria-label="關閉設定">×</button><span class="eyebrow">TABLE PREFERENCES</span><h2 id="settings-title">從容打牌</h2><div class="speed-setting"><div class="speed-heading"><label for="speed-slider">AI 反應速度<small>每次思考的等待秒數</small></label><output id="speed-value" for="speed-slider">1.0 <small>秒</small></output></div><input type="range" id="speed-slider" min="500" max="2000" step="100" value="1000" aria-label="AI 反應速度" aria-valuetext="1.0 秒"><div class="speed-scale"><span>0.5 秒 · 俐落</span><button id="speed-reset" type="button">恢復 1.0 秒</button><span>2.0 秒 · 從容</span></div></div><label class="setting-row"><span>打牌提示<small>游標指向手牌：牌河同牌閃藍光、打出後聽牌與未現張數、可聽牌的打法標記。桌上的牌隨時可指向放大。</small></span><input type="checkbox" id="waits-toggle" checked></label><label class="setting-row"><span>落牌音效<small>輕柔木質敲擊音</small></span><input type="checkbox" id="sound-toggle"></label><p class="muted setting-note">速度可隨時拖曳調整並自動記住。難度與底台在新開一桌時設定。</p><button class="secondary-button" id="back-lobby">回到大廳</button></section></div>
   <div class="modal-layer hidden" id="characters-modal"><section class="modal character-modal" role="dialog" aria-modal="true" aria-labelledby="characters-title"><button class="close-button" data-close="characters-modal" aria-label="關閉牌友圖鑑">×</button><div class="character-heading"><div><span class="eyebrow">THE JADE COLLECTION · 10 ORIGINAL CHARACTERS</span><h2 id="characters-title">十位牌友，十種風景。</h2></div><span class="collection-count">六位女性 / 四位男性</span></div><div class="character-layout"><div class="character-detail" id="character-detail"></div><div class="character-roster"><p class="roster-caption">選擇座位，再邀請一位牌友入席</p><div class="seat-picker" id="seat-picker"></div><div class="character-filters" id="character-filters"><button data-filter="all" class="active">全員 10</button><button data-filter="女">女性 6</button><button data-filter="男">男性 4</button></div><div class="character-grid" id="character-grid"></div><p class="roster-note">角色外觀與 AI 難度獨立。點選角色可欣賞完整立繪；若已在其他座位，入席時會交換位置。</p></div></div></section></div>
   <div class="settlement-layer hidden" id="settlement" role="dialog" aria-modal="true" aria-label="本局台數與積分結算"></div>
   <div class="toast" id="toast" role="status"></div>
   <div class="wait-pop" id="wait-pop" aria-live="polite"></div>
+  <div class="tile-zoom" id="tile-zoom" aria-live="polite"></div>
   <script>
 /* 青玉雀莊 · Taiwan 16-tile mahjong. No network or third-party dependency. */
 (function (root, factory) {
@@ -911,6 +922,7 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
       quad(ctx, [TLp, TRp, BRp, BLp]); ctx.fillStyle = o.glowFill || 'rgba(255,220,140,.16)'; ctx.fill();
     }
     ctx.globalAlpha = 1;
+    return { face: [TLp, TRp, BRp, BLp], faceUp };
   }
 
   // ---------------------------------------------------------------- layout
@@ -1183,10 +1195,12 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
         const s = cam.project([p.p[0], 0.01, p.p[2]]), r = 0.7 * cam.F / s[2];
         ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(s[0], s[1], r, r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
       }
-      const pulse = 0.55 + 0.45 * Math.sin(now / 210);
+      const pulse = 0.55 + 0.45 * Math.sin(now / 210); hits = [];
       for (const { a, p } of list) {
         const hl = highlight >= 0 && a.item.id === highlight;
-        drawTile(ctx, cam, p, a.item.id, hl ? Object.assign({}, a.item, { glow: '#72ccff', glowFill: `rgba(90,185,255,${0.18 + 0.2 * pulse})` }) : a.item);
+        const zoomed = hover && hover === a.item.key;
+        const drawn = drawTile(ctx, cam, p, a.item.id, hl || zoomed ? Object.assign({}, a.item, zoomed ? { glow: '#ffe2a6', glowFill: 'rgba(255,226,160,.3)' } : { glow: '#72ccff', glowFill: `rgba(90,185,255,${0.18 + 0.2 * pulse})` }) : a.item);
+        if (a.item.id >= 0 && drawn.faceUp && a.item.key[0] !== 'w') hits.push({ key: a.item.key, id: a.item.id, q: drawn.face });
       }
       if (scene.marker) {
         const m = add(scene.marker, [0, 0.25 + Math.sin(now / 260) * 0.18, 0]), s = cam.project(m), r = 0.34 * cam.F / s[2];
@@ -1208,8 +1222,19 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
     function refreshTheme() { tableCache = null; dirty = true; kick(); }
     let highlight = -1;
     function setHighlight(id) { if (id === highlight) return; highlight = id; dirty = true; kick(); }
+    let hits = [], hover = null;
+    const inside = (q, x, y) => { let s0 = 0; for (let i = 0; i < 4; i++) { const a = q[i], b = q[(i + 1) % 4], c = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]); if (c !== 0) { const sg = Math.sign(c); if (s0 && sg !== s0) return false; s0 = sg; } } return true; };
+    // Topmost face-up table tile under a CSS-pixel point (tiles are drawn back to front).
+    function pick(x, y) {
+      const X = x * dpr, Y = y * dpr;
+      for (let i = hits.length - 1; i >= 0; i--) if (inside(hits[i].q, X, Y)) return hits[i];
+      let best = null, bd = (7 * dpr) ** 2;
+      for (const h of hits) { const cx = (h.q[0][0] + h.q[2][0]) / 2, cy = (h.q[0][1] + h.q[2][1]) / 2, d = (cx - X) ** 2 + (cy - Y) ** 2; if (d < bd) { bd = d; best = h; } }
+      return best;
+    }
+    function setHover(key) { if (key === hover) return; hover = key; dirty = true; kick(); }
     new ResizeObserver(() => { resize(); kick(); }).observe(canvas.parentElement);
-    return { setGame, resize, anchor, setPreset, refreshTheme, setHighlight, get preset() { return presetIndex; }, get presetName() { return PRESETS[presetIndex].name; } };
+    return { setGame, resize, anchor, setPreset, refreshTheme, setHighlight, pick, setHover, get preset() { return presetIndex; }, get presetName() { return PRESETS[presetIndex].name; } };
   }
 
   // A small standalone showcase used by the lobby.
@@ -1319,7 +1344,7 @@ window.JadeCharacters = [
   const signed = n => n > 0 ? '+' + number(n) : n < 0 ? '−' + number(-n) : '±0';
   const visible = id => !$(id).classList.contains('hidden');
   function threatTag(id) {
-    if (!showWaits || !id || game.phase === 'ended') return '';
+    return ''; // opponent tenpai guesses removed by request
     const view = M.publicView(game, 0), t = M.threat(view.opponents[id], view);
     return t >= 0.62 ? `<span class='threat-tag' title='依公開資訊推估的聽牌機率 ${Math.round(t * 100)}%'>⚠ 疑似聽牌</span>` : '';
   }
@@ -1370,6 +1395,40 @@ window.JadeCharacters = [
     }
   }
   function sizeBoard() { layoutOverlays(); }
+  // ---- 放大鏡：指向桌上的棄牌、副露、花牌即可放大
+  let zoomKey = null, zoomTimer = null;
+  function zoomInfo(hit) {
+    const m = /^([rmfh])(\d)-(\d+)(?:-(\d+))?/.exec(hit.key); if (!m) return null;
+    const s = Number(m[2]), p = game.players[s], who = s === 0 ? '你' : p.name;
+    let kind = { r: '棄牌', f: '花牌', h: '手牌' }[m[1]];
+    if (m[1] === 'm') { const meld = p.melds[Number(m[3])]; kind = meld ? (meld.concealed ? '暗槓' : { chi: '吃', pong: '碰', kong: '明槓' }[meld.type]) + ' · 副露' : '副露'; if (meld && !meld.concealed && Number.isInteger(meld.from)) kind += ` · 來自${meld.from === 0 ? '你' : game.players[meld.from].name}`; }
+    if (m[1] === 'r') { const d = p.discards[Number(m[3])]; if (d && d.drawn === true) kind += ' · 摸切'; else if (d && d.drawn === false) kind += ' · 手切'; }
+    let seen = '';
+    if (hit.id < 34) { const vis = M.visibleCounts(M.publicView(game, 0))[hit.id]; seen = `<span class="zoom-seen">你可見 <b>${vis}</b> / 4 張</span>`; }
+    return `${T(hit.id, { size: 'big' })}<div class="zoom-text"><strong>${M.name(hit.id)}</strong><span>${who} · ${kind}</span>${seen}</div>`;
+  }
+  function showZoom(hit, x, y) {
+    const box = $('tile-zoom');
+    if (!hit) { hideZoom(); return; }
+    if (hit.key !== zoomKey) { const html = zoomInfo(hit); if (!html) { hideZoom(); return; } box.innerHTML = html; zoomKey = hit.key; table.setHover(hit.key); }
+    box.classList.add('show');
+    const area = $('board-area').getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
+    let left = area.left + x + 22, top = area.top + y - h - 14;
+    if (left + w > window.innerWidth - 8) left = area.left + x - w - 22;
+    if (top < 8) top = area.top + y + 22;
+    box.style.left = Math.max(8, left) + 'px'; box.style.top = Math.min(window.innerHeight - h - 8, top) + 'px';
+    $('table-canvas').style.cursor = 'zoom-in';
+  }
+  function hideZoom() { $('tile-zoom').classList.remove('show'); zoomKey = null; table.setHover(null); $('table-canvas').style.cursor = ''; }
+  const canvasPoint = e => { const r = $('table-canvas').getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  $('table-canvas').addEventListener('pointermove', e => { if (e.pointerType === 'touch' || paused()) return; const [x, y] = canvasPoint(e); showZoom(table.pick(x, y), x, y); });
+  $('table-canvas').addEventListener('pointerleave', e => { if (e.pointerType !== 'touch') hideZoom(); });
+  $('table-canvas').addEventListener('pointerdown', e => { // tap to magnify on phones
+    if (e.pointerType !== 'touch' || paused()) return;
+    const [x, y] = canvasPoint(e), hit = table.pick(x, y); clearTimeout(zoomTimer);
+    if (hit) { showZoom(hit, x, y); zoomTimer = setTimeout(hideZoom, 2200); } else hideZoom();
+  });
+
   function seatHTML(p) {
     const wind = M.WINDS[(p.id - game.dealer + 4) % 4];
     return `${avatar(p.id)}<div class="seat-info"><strong>${p.name}${p.id === game.dealer ? '<span class="dealer-tag">莊</span>' : ''}</strong><small>${wind}位 · ${M.LEVELS[game.config.difficulty]}${game.phase === 'discard' && game.current === p.id && (p.id || auto) ? '<span class="seat-thinking">•••</span>' : ''}</small><span class="seat-score">${number(p.score)}</span>${threatTag(p.id)}</div>`;
@@ -1587,7 +1646,7 @@ window.JadeCharacters = [
   function setAssist(on) { showWaits = on; $('waits-toggle').checked = on; $('lobby-assist').checked = on; prefs(); if (started || !lobbyVisible) renderTable(); }
   $('waits-toggle').checked = showWaits; $('waits-toggle').onchange = e => setAssist(e.target.checked);
   $('lobby-assist').checked = showWaits; $('lobby-assist').onchange = e => setAssist(e.target.checked);
-  function openModal(id) { /* toast visible on modal */ clearTimeout(toastTimer); $('toast').classList.remove('visible'); $('wait-pop').classList.remove('show'); previousFocus = document.activeElement; $(id).classList.remove('hidden'); clearTimeout(timer); $(id).querySelector('button').focus(); }
+  function openModal(id) { hideZoom(); /* toast visible on modal */ clearTimeout(toastTimer); $('toast').classList.remove('visible'); $('wait-pop').classList.remove('show'); previousFocus = document.activeElement; $(id).classList.remove('hidden'); clearTimeout(timer); $(id).querySelector('button').focus(); }
   function closeModal(id) { $(id).classList.add('hidden'); if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); schedule(); }
   document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeModal(b.dataset.close));
   document.querySelectorAll('.modal-layer').forEach(el => el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); }));
@@ -1625,7 +1684,7 @@ window.JadeCharacters = [
   const rosterButton = document.createElement('button'); rosterButton.id = 'lobby-characters'; rosterButton.className = 'lobby-character-button';
   rosterButton.innerHTML = '<span>✦</span> 邂逅十位牌友 <small>CHARACTER COLLECTION</small><b>↗</b>';
   rosterButton.onclick = () => openCharacters(); document.querySelector('.lobby-story').appendChild(rosterButton);
-  function showLobby() { lobbyVisible = true; clearTimeout(settleTimer); hero.start(); $('lobby').classList.remove('hidden'); $('settings-modal').classList.add('hidden'); $('settlement').classList.add('hidden'); clearTimeout(timer); $('continue-button').classList.toggle('hidden', !started); renderDifficulty(); }
+  function showLobby() { hideZoom(); lobbyVisible = true; clearTimeout(settleTimer); hero.start(); $('lobby').classList.remove('hidden'); $('settings-modal').classList.add('hidden'); $('settlement').classList.add('hidden'); clearTimeout(timer); $('continue-button').classList.toggle('hidden', !started); renderDifficulty(); }
   $('home-button').onclick = showLobby; $('back-lobby').onclick = showLobby;
   function renderDifficulty() { $('difficulty-grid').innerHTML = M.LEVELS.map((l, i) => `<button class="difficulty-option ${difficulty === i ? 'active' : ''}" data-difficulty="${i}" aria-pressed="${difficulty === i}"><strong>${l}</strong><span class="difficulty-stars">${'◆'.repeat(i + 1)}</span><small>${difficultyDetails[i]}</small></button>`).join(''); }
   $('difficulty-grid').addEventListener('click', e => { const b = e.target.closest('[data-difficulty]'); if (b) { difficulty = Number(b.dataset.difficulty); renderDifficulty(); } });
