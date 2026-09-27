@@ -800,11 +800,13 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
   const UP = [0, 1, 0], DOWN = [0, -1, 0];
   const LIGHT = nrm([-0.45, 1, 0.6]);
   const PRESETS = [
-    { name: '經典', pitch: 57, dist: 44, tz: 0.9 },
-    { name: '俯瞰', pitch: 80, dist: 50, tz: 0.4 },
-    { name: '臨場', pitch: 41, dist: 33, tz: 2.4 },
+    { name: '經典', pitch: 58, dist: 120, tz: 0.6 },
+    { name: '俯瞰', pitch: 82, dist: 140, tz: 0.2 },
+    { name: '臨場', pitch: 44, dist: 58, tz: 1.6 },
   ];
-  const D_WALL = 10.6, D_HAND = 13.4, D_MELD = 13.25, D_FLOWER = 12.05, D_RIVER = 3.35, HALF_FELT = 14.9;
+  // Discards and melds are drawn 1.3x and the wall 0.72x so what matters stays legible from any seat.
+  const RS = 1.3, MS = 1.3, WS = 0.72, FS = 0.8;
+  const D_WALL = 11.9, D_HAND = 13.4, D_MELD = 13.4, D_FLOWER = 11.9, D_RIVER = 4.0, HALF_FELT = 14.9;
   const ease = t => 1 - Math.pow(1 - t, 3);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -819,10 +821,13 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
     ctx.strokeStyle = 'rgba(255,255,250,.9)'; ctx.lineWidth = 3; roundRect(ctx, 4, 4, TEX_W - 8, TEX_H - 8, 13); ctx.stroke();
     ctx.strokeStyle = 'rgba(150,140,110,.28)'; ctx.lineWidth = 2; roundRect(ctx, 1.5, 1.5, TEX_W - 3, TEX_H - 3, 16); ctx.stroke();
   }
-  function faceTexture(id) {
-    if (faceCache.has(id)) return faceCache.get(id);
-    const c = document.createElement('canvas'); c.width = TEX_W; c.height = TEX_H;
-    const ctx = c.getContext('2d');
+  // Mip levels rasterised straight from the vector art at each size, so far tiles stay sharp
+  // instead of being shrunk from one big bitmap.
+  const LEVELS = [40, 64, 104, 160, 260, 400];
+  function faceTextureLevel(id, W) {
+    const key = id + '@' + W; if (faceCache.has(key)) return faceCache.get(key);
+    const k = W / TEX_W, c = document.createElement('canvas'); c.width = W; c.height = Math.round(TEX_H * k);
+    const ctx = c.getContext('2d'); ctx.scale(k, k);
     if (id === 'back') {
       const g = ctx.createLinearGradient(0, 0, TEX_W, TEX_H);
       g.addColorStop(0, '#3c8f7f'); g.addColorStop(0.55, '#2a7263'); g.addColorStop(1, '#1d5a4e');
@@ -835,14 +840,27 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
     } else {
       ivory(ctx);
       if (window.TileArt && id >= 0) {
-        const svg = window.TileArt.art(id).replace('<svg ', `<svg width="${TEX_W * 3}" height="${TEX_H * 3}" `);
+        // small levels: art fills more of the face and gets a faint dark halo for contrast
+        const small = W <= 64, iw = Math.round(W * (small ? 0.96 : 0.92)), ih = Math.round(c.height * (small ? 0.97 : 0.95));
+        const svg = window.TileArt.art(id).replace('<svg ', `<svg width="${iw}" height="${ih}" `);
         const img = new Image();
-        img.onload = () => { ctx.drawImage(img, TEX_W * 0.04, TEX_H * 0.025, TEX_W * 0.92, TEX_H * 0.95); onTexture(); };
+        img.onload = () => {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          const x = (W - iw) / 2, y = (c.height - ih) / 2;
+          if (small) { ctx.globalAlpha = 0.35; ctx.filter = 'blur(0.6px)'; ctx.drawImage(img, x, y + 0.5, iw, ih); ctx.filter = 'none'; ctx.globalAlpha = 1; }
+          ctx.drawImage(img, x, y, iw, ih); onTexture();
+        };
         img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
       }
     }
-    faceCache.set(id, c); return c;
+    faceCache.set(key, c); return c;
   }
+  function faceTexture(id, px = TEX_W) {
+    const W = LEVELS.find(l => l >= px) || LEVELS[LEVELS.length - 1];
+    return faceTextureLevel(id, W);
+  }
+  // warm the common levels so the first frames are already sharp
+  function preload() { for (let t = 0; t < 42; t++) for (const W of [64, 104, 160]) faceTextureLevel(t, W); }
 
   // ---------------------------------------------------------------- camera
   function Camera(preset) {
@@ -911,10 +929,12 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
     const uu = faceUp ? u : mul(u, -1);
     const Q = (a, b) => add(add(add(p, mul(uu, a)), mul(v, b)), mul(n, ht * sign));
     const TLp = pr(Q(-hw, hl)), TRp = pr(Q(hw, hl)), BRp = pr(Q(hw, -hl)), BLp = pr(Q(-hw, -hl));
-    const img = faceUp ? faceTexture(id >= 0 ? id : -1) : faceTexture('back');
+    const px = Math.max(Math.hypot(TRp[0] - TLp[0], TRp[1] - TLp[1]), Math.hypot(BLp[0] - TLp[0], BLp[1] - TLp[1]) * TEX_W / TEX_H);
+    const img = faceUp ? faceTexture(id >= 0 ? id : -1, px) : faceTexture('back', px);
     quad(ctx, [TLp, TRp, BRp, BLp]); ctx.fillStyle = faceUp ? rgb(IVORY, sh * 0.9) : rgb(o.tint || JADE, sh * 0.85); ctx.fill();
     ctx.save(); quad(ctx, [TLp, TRp, BRp, BLp]); ctx.clip();
-    ctx.setTransform((TRp[0] - TLp[0]) / TEX_W, (TRp[1] - TLp[1]) / TEX_W, (BLp[0] - TLp[0]) / TEX_H, (BLp[1] - TLp[1]) / TEX_H, TLp[0], TLp[1]);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.setTransform((TRp[0] - TLp[0]) / img.width, (TRp[1] - TLp[1]) / img.width, (BLp[0] - TLp[0]) / img.height, (BLp[1] - TLp[1]) / img.height, TLp[0], TLp[1]);
     ctx.drawImage(img, 0, 0); ctx.restore();
     if (sh < 0.98) { quad(ctx, [TLp, TRp, BRp, BLp]); ctx.fillStyle = `rgba(16,26,28,${clamp((1.02 - sh) * 0.65, 0, 0.5)})`; ctx.fill(); }
     if (o.glow) {
@@ -927,11 +947,14 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
 
   // ---------------------------------------------------------------- layout
   const pose = (p, u, v, n) => ({ p, u, v, n });
-  const lying = (s, along, dist, lift = 0, faceDown = false, scale = 1) => pose(
-    add(add(mul(DIR[s], dist), mul(RIGHT[s], along)), [0, TT * scale / 2 + lift, 0]),
-    faceDown ? mul(RIGHT[s], -1) : RIGHT[s], mul(DIR[s], -1), faceDown ? DOWN : UP);
+  // Face-up tiles of the opposite seat are turned to read upright from your chair.
+  const lying = (s, along, dist, lift = 0, faceDown = false, scale = 1) => {
+    const flip = s === 2 && !faceDown;
+    return pose(add(add(mul(DIR[s], dist), mul(RIGHT[s], along)), [0, TT * scale / 2 + lift, 0]),
+      faceDown || flip ? mul(RIGHT[s], -1) : RIGHT[s], flip ? DIR[s] : mul(DIR[s], -1), faceDown ? DOWN : UP);
+  };
   const standing = (s, along, dist) => pose(add(add(mul(DIR[s], dist), mul(RIGHT[s], along)), [0, TL / 2, 0]), RIGHT[s], UP, DIR[s]);
-  function wallStack(g) { const order = [0, 3, 2, 1], side = order[Math.floor(g / 18)], j = g % 18; return { side, along: 8.5 - j }; }
+  function wallStack(g) { const order = [0, 3, 2, 1], side = order[Math.floor(g / 18)], j = g % 18; return { side, along: (8.5 - j) * WS }; }
 
   function buildScene(game, opt = {}) {
     const tiles = [], ended = game.phase === 'ended', result = game.result;
@@ -955,7 +978,7 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
       const { side, along } = wallStack((g0 + k) % 72);
       [1, 0].forEach(layer => { // bottom (1) first, then top (0)
         if (!alive[k][layer]) return;
-        tiles.push({ key: 'w' + (k * 2 + layer), id: -2, pose: lying(side, along, D_WALL, layer === 0 ? TT : 0, true), dim: reserved.has(k * 2 + layer) ? 0.8 : 1, still: true });
+        tiles.push({ key: 'w' + (k * 2 + layer), id: -2, pose: lying(side, along, D_WALL, layer === 0 ? TT * WS : 0, true, WS), scale: WS, dim: reserved.has(k * 2 + layer) ? 0.8 : 1, still: true });
       });
     }
     let marker = null;
@@ -975,7 +998,7 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
         });
         x += 0.7;
       } else {
-        const width = p.melds.reduce((a, m) => a + m.tiles.length * TW + 0.28 - (m.tiles.length === 4 ? 1 : 0), 0);
+        const width = p.melds.reduce((a, m) => a + (m.tiles.length === 4 ? 3 : m.tiles.length) * TW * MS + 0.3, 0);
         x = 13.9 - width;
         if (ended) { // your hand is shown on the table at the end too
           let hx = x - p.hand.length * 1.0 - 0.7;
@@ -991,22 +1014,21 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
         const show = s === 0 || !m.concealed || (ended && reveal);
         m.tiles.forEach((t, ti) => {
           const top = m.tiles.length === 4 && ti === 3;
-          const along = top ? x - 2 + 0.5 : x + 0.5;
+          const along = top ? x - 1.5 * MS : x + 0.5 * MS;
           const faceDown = m.concealed && !(s === 0 && (ti === 1 || ti === 2)) && !ended;
           const fromRiver = m.called === t && !m.concealed && ti === m.tiles.indexOf(t) && opt.riverPose && opt.riverPose[m.from];
-          tiles.push({ key: `m${s}-${mi}-${ti}`, id: show || !faceDown ? t : -2, pose: lying(s, along, D_MELD, top ? TT : 0, faceDown), spawn: fromRiver || lying(s, along, D_MELD, 2.4, faceDown), arc: 1 });
-          if (!top) x += TW;
+          tiles.push({ key: `m${s}-${mi}-${ti}`, id: show || !faceDown ? t : -2, pose: lying(s, along, D_MELD, top ? TT * MS : 0, faceDown, MS), scale: MS, spawn: fromRiver || lying(s, along, D_MELD, 2.4, faceDown, MS), arc: 1 });
+          if (!top) x += TW * MS;
         });
-        x += 0.28;
+        x += 0.3;
       });
       // --- flowers
       p.flowers.forEach((f, i) => {
-        const along = s === 0 ? -12.6 + i * 0.78 : -8.3 + i * 0.78 + 0.39;
-        const dist = s === 0 ? D_HAND - 0.3 : D_FLOWER;
-        tiles.push({ key: `f${s}-${i}`, id: f, pose: lying(s, along, dist, 0, false, 0.72), scale: 0.72, spawn: lying(s, along, dist, 2.2, false, 0.72), arc: 1 });
+        const along = -11.6 + i * 0.84 + 0.4, dist = D_FLOWER;
+        tiles.push({ key: `f${s}-${i}`, id: f, pose: lying(s, along, dist, 0, false, FS), scale: FS, spawn: lying(s, along, dist, 2.2, false, FS), arc: 1 });
       });
       // --- river
-      let r = 0; const many = p.discards.filter(d => !d.claimed).length > 30, sc = many ? 0.86 : 1;
+      let r = 0; const many = p.discards.filter(d => !d.claimed).length > 24, sc = many ? RS * 0.8 : RS;
       p.discards.forEach((d, i) => {
         if (d.claimed) return;
         const col = r % 6, row = Math.floor(r / 6); r++;
@@ -1028,18 +1050,19 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
     let cam = null, w = 0, h = 0, dpr = 1, presetIndex = 0, tableCache = null, hubTex = null, hubKey = '';
     let scene = { tiles: [], marker: null }, anims = new Map(), dirty = true, raf = 0, lastFrame = 0, game = null, hubState = null;
     const riverPose = {};
+    preload();
     onTexture = () => { dirty = true; };
     function felt() { const cs = getComputedStyle(document.body); return [cs.getPropertyValue('--felt').trim() || '#183d4b', cs.getPropertyValue('--felt-dark').trim() || '#102e3d']; }
     function resize() {
       const box = canvas.parentElement.getBoundingClientRect();
-      dpr = Math.min(2, window.devicePixelRatio || 1); w = Math.max(50, box.width); h = Math.max(50, box.height);
+      dpr = Math.min(3, Math.max(2, window.devicePixelRatio || 1)); w = Math.max(50, box.width); h = Math.max(50, box.height);
       canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
       const preset = PRESETS[presetIndex];
       cam = Camera(preset); cam.dpr = dpr;
-      const B = 14.1, pts = [];
+      const B = 14.5, pts = [];
       for (const x of [-B, B]) for (const z of [-15.6, 13.9]) for (const y of [0, TL]) pts.push([x, y, z]);
       const narrow = w / h < 0.85;
-      cam.fit(canvas.width, canvas.height, narrow ? pts.map(P => [P[0] * 0.97, P[1], P[2]]) : pts, (narrow ? 2 : 10) * dpr);
+      cam.fit(canvas.width, canvas.height, pts, (narrow ? 2 : 10) * dpr);
       tableCache = null; dirty = true; hubKey = '';
       if (options.onLayout) options.onLayout();
     }
@@ -1147,9 +1170,22 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
       return { p, u, v, n };
     }
     const same = (a, b) => Math.abs(a.p[0] - b.p[0]) + Math.abs(a.p[1] - b.p[1]) + Math.abs(a.p[2] - b.p[2]) + Math.abs(a.n[0] - b.n[0]) + Math.abs(a.n[1] - b.n[1]) + Math.abs(a.n[2] - b.n[2]) + Math.abs(a.v[0] - b.v[0]) + Math.abs(a.v[2] - b.v[2]) < 0.01;
+    let targetRects = [];
+    function computeRects(built) {
+      targetRects = [];
+      for (const it of built.tiles) {
+        const sc = it.scale || 1, { p, u, v, n } = it.pose; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        for (const a of [-1, 1]) for (const b of [-1, 1]) for (const c of [-1, 1]) {
+          const q = cam.project(add(add(add(p, mul(u, a * TW * sc / 2)), mul(v, b * TL * sc / 2)), mul(n, c * TT * sc / 2)));
+          x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]);
+        }
+        targetRects.push({ x: x0 / dpr, y: y0 / dpr, w: (x1 - x0) / dpr, h: (y1 - y0) / dpr, key: it.key });
+      }
+    }
     function setGame(g, instant = false) {
       game = g;
       const built = buildScene(g, { riverPose });
+      if (cam) computeRects(built);
       const now = performance.now(), next = new Map();
       for (const it of built.tiles) {
         const prev = anims.get(it.key);
@@ -1234,7 +1270,7 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
     }
     function setHover(key) { if (key === hover) return; hover = key; dirty = true; kick(); }
     new ResizeObserver(() => { resize(); kick(); }).observe(canvas.parentElement);
-    return { setGame, resize, anchor, setPreset, refreshTheme, setHighlight, pick, setHover, get preset() { return presetIndex; }, get presetName() { return PRESETS[presetIndex].name; } };
+    return { setGame, resize, anchor, setPreset, refreshTheme, setHighlight, pick, setHover, tileRects: () => targetRects, get preset() { return presetIndex; }, get presetName() { return PRESETS[presetIndex].name; } };
   }
 
   // A small standalone showcase used by the lobby.
@@ -1386,13 +1422,25 @@ window.JadeCharacters = [
       // seat 1 grows rightwards from its anchor, seat 3 leftwards, seat 2 sits beside the far hand
       const wdt = r.width || 120, hgt = r.height || 90;
       if (area.width < 640) { // compact corner chips on phones
-        seat.style.left = (s === 3 ? 6 : area.width - wdt - 6) + 'px';
-        seat.style.top = (s === 1 ? area.height - hgt - 30 : 6) + 'px'; continue;
+        avoidTiles(seat, s, s === 3 ? 6 : area.width - wdt - 6, s === 1 ? area.height - hgt - 30 : 6, wdt, hgt, area); continue;
       }
       const left = s === 3 ? a.x - wdt : a.x;
-      seat.style.left = Math.max(6, Math.min(area.width - wdt - 6, left)) + 'px';
-      seat.style.top = Math.max(6, Math.min(area.height - hgt - 6, a.y - hgt / 2)) + 'px';
+      avoidTiles(seat, s, Math.max(6, Math.min(area.width - wdt - 6, left)), Math.max(6, Math.min(area.height - hgt - 6, a.y - hgt / 2)), wdt, hgt, area);
     }
+  }
+  // Seat panels never cover table tiles (discards, melds, flowers, hands): try nearby spots and keep the clearest.
+  function avoidTiles(seat, s, x, y, w, h, area) {
+    const rects = table.tileRects(), overlap = (px, py) => { let o = 0; for (const r of rects) { const ix = Math.min(px + w, r.x + r.w) - Math.max(px, r.x), iy = Math.min(py + h, r.y + r.h) - Math.max(py, r.y); if (ix > 0 && iy > 0) o += ix * iy * (r.key[0] === 'w' ? 0.25 : 1); } return o; };
+    const out = s === 3 ? -1 : 1, cands = [];
+    for (const dy of [0, -24, 24, -48, 48, -80, 80, -120, 120, -170, 170, -230, 230]) for (const dx of [0, 30 * out, 70 * out, 120 * out, -40 * out]) cands.push([x + dx, y + dy]);
+    let best = null;
+    for (const [cx, cy] of cands) {
+      const px = Math.max(4, Math.min(area.width - w - 4, cx)), py = Math.max(4, Math.min(area.height - h - 4, cy));
+      const score = overlap(px, py) + Math.hypot(px - x, py - y) * 0.6;
+      if (!best || score < best[2]) best = [px, py, score];
+      if (overlap(px, py) === 0 && Math.hypot(px - x, py - y) < 1) break;
+    }
+    seat.style.left = best[0] + 'px'; seat.style.top = best[1] + 'px';
   }
   function sizeBoard() { layoutOverlays(); }
   // ---- 放大鏡：指向桌上的棄牌、副露、花牌即可放大
