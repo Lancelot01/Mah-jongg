@@ -118,6 +118,18 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
 .tile-zoom .zoom-seen{color:#8fb3ad;font-size:10px}.tile-zoom .zoom-seen b{font:14px Georgia,serif;color:#ffe2a6;font-weight:400}
 @media(max-width:600px){.tile-zoom{gap:10px;padding:9px 12px 9px 9px}.tile-zoom .tile.big{--tw:46px;--th:64px}.tile-zoom strong{font-size:18px}}
 
+/* ---- v2.3 左側自動操作（雀麻式快捷選單） ---- */
+.auto-quick-menu{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:18;width:112px;padding:7px;border:1px solid #cfb47c38;border-radius:7px;background:linear-gradient(145deg,#132b33e8,#0c1d25e3);box-shadow:0 10px 30px #0008,inset 0 1px 0 #ffffff0b;backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:6px}
+.auto-quick-title{font:8px Georgia,serif;letter-spacing:2px;color:#8da59e;padding:1px 4px 3px;border-bottom:1px solid #cfb47c20;text-align:center}
+.auto-quick-button{height:34px;width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 9px;border:1px solid #77918c38;border-radius:4px;background:#1b303780;color:#aebfba;font-size:11px;letter-spacing:1px;transition:background .18s,border-color .18s,color .18s,box-shadow .18s}
+.auto-quick-button:hover{filter:none;border-color:#cfb47c66;background:#223b4199}
+.auto-quick-button i{width:9px;height:9px;border-radius:50%;background:#4c605e;box-shadow:inset 0 0 0 1px #9aaba733;flex-shrink:0;transition:.18s}
+.auto-quick-button.active{color:#ffe3a8;border-color:#d6b87399;background:linear-gradient(135deg,#725d342e,#24423f99);box-shadow:inset 2px 0 #e3c580,0 0 13px #d9bb7030}
+.auto-quick-button.active i{background:#8fd0b8;box-shadow:0 0 9px #88d8b8,inset 0 0 0 1px #e8fff2}
+.auto-quick-button:focus-visible{outline-offset:2px}
+@media(max-width:850px){.auto-quick-menu{left:7px;width:96px;padding:5px;gap:4px}.auto-quick-title{font-size:7px}.auto-quick-button{height:30px;padding:0 7px;font-size:9px;letter-spacing:.5px}}
+@media(max-width:600px){.auto-quick-menu{left:5px;top:50%;width:82px;padding:4px;border-radius:5px}.auto-quick-title{display:none}.auto-quick-button{height:28px;padding:0 5px;font-size:8px;letter-spacing:0}.auto-quick-button i{width:7px;height:7px}}
+
 </style>
 </head>
 <body>
@@ -131,6 +143,11 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
     <section class="game-layout">
       <aside class="left-rail"><span class="vertical-title">一席方城，半日閒。</span><span class="rail-line"></span><span class="vertical-sub">TAIWAN · 16 TILES</span></aside>
       <div id="board-area" class="board-area">
+        <div class="auto-quick-menu" id="auto-quick-menu" aria-label="自動操作">
+          <span class="auto-quick-title">AUTO ASSIST</span>
+          <button type="button" class="auto-quick-button" id="auto-hu-button" aria-pressed="false" title="有合法胡牌時自動胡牌"><span>自動胡牌</span><i aria-hidden="true"></i></button>
+          <button type="button" class="auto-quick-button" id="auto-kong-button" aria-pressed="false" title="摸牌後有合法暗槓時自動暗槓；不包含加槓與明槓"><span>自動暗槓</span><i aria-hidden="true"></i></button>
+        </div>
         <div class="table-stage" id="board-scene">
           <canvas id="table-canvas" role="img" aria-label="3D 牌桌：牌牆、牌河、副露與中央計分台"></canvas>
           <div class="seat seat-right" id="seat-1"></div><div class="seat seat-top" id="seat-2"></div><div class="seat seat-left" id="seat-3"></div>
@@ -1325,6 +1342,7 @@ body.jade-theme{--felt:#225248;--felt-dark:#14392f}.jade-theme .lobby{background
     }
     return { timingVersion: 2, speed: p.timingVersion === 2 ? normalizeSpeed(p.speed) : DEFAULT_SPEED,
       sound: p.sound === true, showWaits: p.showWaits !== false, jade: p.jade === true, seatCharacters,
+      autoHu: p.autoHu === true, autoConcealedKong: p.autoConcealedKong === true,
       view: Number.isInteger(p.view) && p.view >= -1 && p.view <= 2 ? p.view : -1 };
   }
   const seconds = speed => (normalizeSpeed(speed) / 1000).toFixed(1);
@@ -1355,7 +1373,7 @@ window.JadeCharacters = [
   const STORAGE = 'jade-mahjong-save-v1', PREFS = 'jade-mahjong-prefs-v1';
   const difficultyDetails = ['隨性出牌 · 輕鬆熟悉', '重視牌形 · 偶有失誤', '計算進張 · 避開險牌', '讀牌防守 · 深度思考'];
   const tableNames = ['春風小席', '青玉雅席', '墨竹上席', '藏龍名席'];
-  let game, started = false, selected = -1, hintTile = null, timer = null, auto = false, speed = 1000, sound = false, showWaits = true;
+  let game, started = false, selected = -1, hintTile = null, timer = null, auto = false, autoHu = false, autoConcealedKong = false, speed = 1000, sound = false, showWaits = true;
   let difficulty = 1, lobbyVisible = true, renderedResult = null, lastClickTime = 0, audioContext = null, toastTimer;
   let previousFocus = null, lastSettlement = null, settleTimer = null, revealing = false;
   let preferences = {};
@@ -1363,7 +1381,7 @@ window.JadeCharacters = [
   preferences = P.normalize(preferences);
   let viewPreset = preferences.view;
   let seatCharacters = preferences.seatCharacters.slice(), gallerySeat = 0, galleryCharacter = seatCharacters[0], characterFilter = 'all';
-  speed = preferences.speed; sound = preferences.sound; showWaits = preferences.showWaits;
+  speed = preferences.speed; sound = preferences.sound; showWaits = preferences.showWaits; autoHu = preferences.autoHu; autoConcealedKong = preferences.autoConcealedKong;
   if (preferences.jade) document.body.classList.add('jade-theme');
   try { const save = JSON.parse(localStorage.getItem(STORAGE)); if (save && save.phase !== 'idle') { game = M.Game.restore(save); started = true; difficulty = game.config.difficulty; } } catch (_) {}
   if (!game) { game = new M.Game(); game.startRound(); }
@@ -1385,7 +1403,7 @@ window.JadeCharacters = [
     return t >= 0.62 ? `<span class='threat-tag' title='依公開資訊推估的聽牌機率 ${Math.round(t * 100)}%'>⚠ 疑似聽牌</span>` : '';
   }
   const paused = () => document.hidden || lobbyVisible || visible('rules-modal') || visible('settings-modal') || visible('characters-modal') || visible('settlement');
-  function prefs() { try { localStorage.setItem(PREFS, JSON.stringify({ timingVersion: 2, speed, sound, showWaits, seatCharacters, view: viewPreset, jade: document.body.classList.contains('jade-theme') })); } catch (_) {} }
+  function prefs() { try { localStorage.setItem(PREFS, JSON.stringify({ timingVersion: 2, speed, sound, showWaits, autoHu, autoConcealedKong, seatCharacters, view: viewPreset, jade: document.body.classList.contains('jade-theme') })); } catch (_) {} }
   function save() { if (!started) return; try { localStorage.setItem(STORAGE, JSON.stringify(game.toJSON())); } catch (_) {} }
   function toast(message) { clearTimeout(toastTimer); $('toast').textContent = message; $('toast').classList.add('visible'); toastTimer = setTimeout(() => $('toast').classList.remove('visible'), 4200); }
   function tone(kind = 'tile') {
@@ -1503,6 +1521,7 @@ window.JadeCharacters = [
     table.setGame(game); layoutOverlays();
     $('status').textContent = auto && game.phase !== 'ended' ? '託管中 · 再按「託管」隨時接手' : game.message;
     $('auto-button').classList.toggle('active', auto); $('auto-button').textContent = auto ? '託管 ●' : '託管 ○'; $('auto-button').setAttribute('aria-pressed', auto);
+    syncAutoQuick();
     $('game-log').innerHTML = game.log.slice(-24).map(l => `<p class="${l.type}">${l.text}</p>`).join('');
     $('game-log').scrollTop = $('game-log').scrollHeight;
     renderActions(); refreshAssist();
@@ -1624,9 +1643,27 @@ window.JadeCharacters = [
     clearTimeout(timer);
     if (paused() || game.phase === 'ended') return;
     if (game.phase === 'claim') {
-      if (!auto && game.claimOptions(0).length) return;
+      const mine = game.claimOptions(0);
+      if (!auto && mine.length) {
+        const autoWin = autoHu ? mine.find(o => o.type === 'hu') : null;
+        if (!autoWin) return;
+        timer = setTimeout(() => { if (!paused() && game.phase === 'claim') resolve(autoWin); }, 110);
+        return;
+      }
       const hasDecision = [0, 1, 2, 3].some(id => (id !== 0 || auto) && game.claimOptions(id).length > 0);
       timer = setTimeout(() => { if (!paused()) resolve(null); }, P.reactionDelay(speed, hasDecision));
+    } else if (game.phase === 'discard' && game.current === 0 && !auto) {
+      const options = game.selfOptions(0), win = options.find(o => o.type === 'hu');
+      // 胡牌權永遠高於暗槓：若未開自動胡牌，就把決定留給玩家，不讓自動暗槓跳過可胡牌。
+      if (win && !autoHu) return;
+      const automatic = win || (autoConcealedKong ? options.find(o => o.type === 'concealedKong') : null);
+      if (!automatic) return;
+      timer = setTimeout(() => {
+        if (paused() || game.phase !== 'discard' || game.current !== 0) return;
+        const legal = game.selfOptions(0).find(o => o.type === automatic.type && o.tile === automatic.tile);
+        if (!legal) { renderTable(); return; }
+        const before = game.eventSerial; game.selfAction(0, legal); afterMove(before);
+      }, 110);
     } else if (game.phase === 'discard' && (game.current !== 0 || auto)) {
       timer = setTimeout(() => {
         if (paused()) return;
@@ -1675,6 +1712,18 @@ window.JadeCharacters = [
     else p.hand = M.sorted(p.hand);
     selected = -1; renderTable(); toast('已按萬、筒、索、字牌整理。新摸的牌留在右側。');
   };
+  function syncAutoQuick() {
+    const hu = $('auto-hu-button'), kong = $('auto-kong-button');
+    hu.classList.toggle('active', autoHu); hu.setAttribute('aria-pressed', autoHu);
+    kong.classList.toggle('active', autoConcealedKong); kong.setAttribute('aria-pressed', autoConcealedKong);
+  }
+  function toggleQuick(kind) {
+    if (kind === 'hu') { autoHu = !autoHu; toast(`自動胡牌${autoHu ? '已開啟' : '已關閉'}。`); }
+    else { autoConcealedKong = !autoConcealedKong; toast(`自動暗槓${autoConcealedKong ? '已開啟' : '已關閉'}${autoConcealedKong ? '；只處理暗槓，不會自動加槓或明槓。' : '。'}`); }
+    selected = -1; prefs(); renderTable(); schedule();
+  }
+  $('auto-hu-button').onclick = () => toggleQuick('hu');
+  $('auto-kong-button').onclick = () => toggleQuick('kong');
   $('auto-button').onclick = () => { auto = !auto; selected = -1; renderTable(); schedule(); };
   $('log-toggle').onclick = () => $('game-log').classList.toggle('hidden');
   function syncSound() { $('sound-button').textContent = sound ? '♫' : '♪'; $('sound-button').title = sound ? '關閉音效' : '開啟音效'; $('sound-button').setAttribute('aria-label', $('sound-button').title); $('sound-toggle').checked = sound; prefs(); }
